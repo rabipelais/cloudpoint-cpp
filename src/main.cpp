@@ -1,16 +1,14 @@
-#include <pcl/io/io.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/features/integral_image_normal.h>
-#include <pcl/visualization/cloud_viewer.h>
+
 #include <pcl/point_types.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/common/centroid.h>
 
 #include "mongo/client/dbclient.h"
 #include "mongo/bson/bson.h"
 #include <iostream>
 #include <stdio.h>
+
+#include "featurebag.hpp"
+
 using std::cout;
 using std::endl;
 
