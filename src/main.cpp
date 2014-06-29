@@ -7,11 +7,17 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/common/centroid.h>
 
+#include "mongo/client/dbclient.h"
+#include "mongo/bson/bson.h"
 #include <iostream>
 #include <stdio.h>
-
 using std::cout;
 using std::endl;
+
+using mongo::BSONArray;
+using mongo::BSONObj;
+
+BSONObj findMatchingObjects(mongo::DBClientConnection &c);
 
 int main(int argc, char* argv[])
 {
@@ -42,4 +48,27 @@ int main(int argc, char* argv[])
 		  << " "    << cloud->points[i].y
 		  << " "    << cloud->points[i].z << std::endl;
 
+    mongo::DBClientConnection mongoConnection;
+    try {
+	    mongoConnection.connect("localhost");
+        cout << "Connected ok to mongoDB" << endl;
+    } catch( const mongo::DBException &e ) {
+        cout << "Caught " << e.what() << endl;
+        return 1;
+    }
+    BSONObj res = findMatchingObjects(mongoConnection);
+    cout << res.toString() << endl;
+}
+
+
+BSONObj findMatchingObjects(mongo::DBClientConnection &c) {
+	std::string feature = "d2";
+	BSONArray pipeline = BSON_ARRAY(
+		BSON("$unwind" << "$features") <<
+		BSON("$match" << BSON("features.type" << feature)) <<
+		BSON("$group" << BSON("_id" << "$name" << "features" << BSON("$push" << "$features")))
+		);
+	BSONObj res;
+	c.runCommand("tesis", BSON("aggregate" << "objects" << "pipeline" << pipeline), res);
+	return res;
 }
