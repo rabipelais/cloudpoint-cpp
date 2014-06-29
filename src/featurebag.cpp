@@ -9,8 +9,10 @@
 #include <pcl/surface/convex_hull.h>
 
 #include <stdlib.h>
+#include <iostream>
 #include <algorithm>
-
+using std::cout;
+using std::endl;
 
 const int MAX_SAMPLES = 100000;
 const int MAX_PAIRS = 100000;
@@ -21,9 +23,13 @@ FeatureBag::FeatureBag() {
 }
 
 FeatureBag::FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
-	: cloud(cloud)
+	: cloud(cloud), features()
 {
+	int bins = 15;
 	//Calculate features
+	calculateD2(bins);
+	calculateA3(bins);
+	calculateAreaAndVolume();
 }
 
 FeatureBag::~FeatureBag() {
@@ -31,12 +37,13 @@ FeatureBag::~FeatureBag() {
 }
 
 std::vector<double> makeHistogram(int bins, std::vector<double> values) {
-	std::vector<double> histogram = std::vector<double>(bins);
+	std::vector<double> histogram(bins);
 	double width = *std::max_element(values.begin(), values.end()) / (double) bins;
 
 	for(int i = 0; i < values.size(); i++) {
 		histogram[std::min((int) (values.at(i) / width), bins - 1)]++;
 	}
+	return histogram;
 }
 
 double distance(pcl::PointXYZ a, pcl::PointXYZ b) {
@@ -66,21 +73,22 @@ double angle(pcl::PointXYZ a, pcl::PointXYZ b, pcl::PointXYZ c) {
 	double d2 = norm(v2);
 	double prod = dot(v1, v2);
 
-	return acos(prod / (d1 * d2));
+	return std::max(0.0, acos(prod / (d1 * d2)));
 }
 
 void FeatureBag::calculateD2(int bins) {
+	cout << "Calculating D2..." << endl;
 	int numPoints = cloud->points.size();
 	std::vector<int> indices = std::vector<int>(std::min(numPoints, MAX_SAMPLES));
 
 	if(numPoints < MAX_SAMPLES) {
 		//Take all the points
-		for(int i = 0; i < numPoints; i++) {
+		for(int i = 0; i < indices.size(); i++) {
 			indices[i] = i;
 		}
 	} else {
 		//Sample enough points
-		for(int i = 0; i < MAX_SAMPLES; i++) {
+		for(int i = 0; i < indices.size(); i++) {
 			indices[i] = rand() % numPoints;
 		}
 	}
@@ -99,26 +107,27 @@ void FeatureBag::calculateD2(int bins) {
 		//Calculate the distance
 		distances[i] = distance(cloud->points[indices[first]], cloud->points[indices[second]]);
 	}
-	d2Histogram = makeHistogram(bins, distances);
+	features.d2Histogram = makeHistogram(bins, distances);
 }
 
 void FeatureBag::calculateA3(int bins) {
+	cout << "Calculating A3..." << endl;
 	int numPoints = cloud->points.size();
 	std::vector<int> indices = std::vector<int>(std::min(numPoints, MAX_SAMPLES));
 
 	if(numPoints < MAX_SAMPLES) {
 		//Take all the points
-		for(int i = 0; i < numPoints; i++) {
+		for(int i = 0; i < indices.size(); i++) {
 			indices[i] = i;
 		}
 	} else {
 		//Sample enough points
-		for(int i = 0; i < MAX_SAMPLES; i++) {
+		for(int i = 0; i < indices.size(); i++) {
 			indices[i] = rand() % numPoints;
 		}
 	}
 
-	std::vector<double> angles = std::vector<double>(MAX_TRIOS);
+	std::vector<double> angles(MAX_TRIOS);
 	int first;
 	int second;
 	int third;
@@ -138,10 +147,11 @@ void FeatureBag::calculateA3(int bins) {
 		//Calculate the angle
 		angles[i] = angle(cloud->points[indices[first]], cloud->points[indices[second]], cloud->points[indices[third]]);
 	}
-	a3Histogram = makeHistogram(bins, angles);
+	features.a3Histogram = makeHistogram(bins, angles);
 }
 
 void FeatureBag::calculateAreaAndVolume() {
+	cout << "Calculating area and volume..." << endl;
 	pcl::ConvexHull<pcl::PointXYZ> cHull;
 	pcl::PointCloud<pcl::PointXYZ> cHull_points;
 	cHull.setComputeAreaVolume(true);
@@ -150,6 +160,12 @@ void FeatureBag::calculateAreaAndVolume() {
 	cHull.setInputCloud(cloud);
 	cHull.reconstruct (cHull_points, polygons);
 
-	area = cHull.getTotalArea();
-	volume = cHull.getTotalVolume();
+	features.area = cHull.getTotalArea();
+	features.volume = cHull.getTotalVolume();
+}
+
+
+
+Features features::fromBSONObj(BSONObj obj) {
+	return Features();
 }
