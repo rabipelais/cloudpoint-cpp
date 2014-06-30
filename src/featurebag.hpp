@@ -30,6 +30,9 @@ public:
 	double getArea() {return features.area;}
 	double getVolume() {return features.volume;}
 
+	double compareD2(std::vector<double> vals);
+	double compareA3(std::vector<double> vals);
+
 private:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
 
@@ -42,6 +45,8 @@ private:
 
 namespace features {
 	Features fromBSONObj(BSONObj obj);
+	std::vector<double> normalize(std::vector<double> x);
+	double compareHistograms(std::vector<double> a, std::vector<double> b);
 }
 
 #endif

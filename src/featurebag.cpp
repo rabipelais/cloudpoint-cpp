@@ -164,8 +164,34 @@ void FeatureBag::calculateAreaAndVolume() {
 	features.volume = cHull.getTotalVolume();
 }
 
+double FeatureBag::compareD2(std::vector<double> vals) {
+	return features::compareHistograms(vals, this->features.d2Histogram);
+}
 
+double FeatureBag::compareA3(std::vector<double> vals) {
+	return features::compareHistograms(vals, this->features.a3Histogram);
+}
 
 Features features::fromBSONObj(BSONObj obj) {
 	return Features();
+}
+
+std::vector<double> features::normalize(std::vector<double> x) {
+	std::vector<double> n(x.size());
+	double max = *std::max_element(x.begin(), x.end());
+	for(int i = 0; i < n.size(); i++) {
+		n[i] = x[i] / max;
+	}
+	return n;
+}
+
+double features::compareHistograms(std::vector<double> a, std::vector<double> b) {
+	double diff = 0.0;
+	std::vector<double> an = features::normalize(a);
+	std::vector<double> bn = features::normalize(b);
+
+	for(int i = 0; i < an.size(); i++) {
+		diff += std::pow(an[i] - bn[i], 2);
+	}
+	return diff;
 }
