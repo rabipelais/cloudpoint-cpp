@@ -36,6 +36,13 @@ public:
 	double getArea() {return features.area;}
 	double getVolume() {return features.volume;}
 
+	double getBBVolume() {return features.bbVolume;}
+	double getBBLong() {return features.bbLong;}
+	double getBBMedian() {return features.bbMedian;}
+	double getBBShort() {return features.bbShort;}
+	double getBBLongShort() {return features.bbLongShort;}
+	double getBBMedianShort() {return features.bbMedianShort;}
+
 	double compareD2(std::vector<double> vals);
 	double compareA3(std::vector<double> vals);
 

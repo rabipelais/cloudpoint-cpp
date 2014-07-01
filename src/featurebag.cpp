@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <algorithm>
+#include <limits>
 using std::cout;
 using std::endl;
 
@@ -247,12 +248,19 @@ std::auto_ptr<mongo::DBClientCursor> findObjectsWithFeatures(mongo::DBClientConn
 
 void features::compareToDB(FeatureBag features, mongo::DBClientConnection &c) {
 	std::auto_ptr<mongo::DBClientCursor> cursor = findObjectsWithFeatures(c);
-	double minD2 = 100000;
-	double minA3 = 100000;
-	double minArea = 100000;
-	double minVolume = 100000;
+	double minD2 = std::numeric_limits<double>::max();
+	double minA3 = std::numeric_limits<double>::max();
+	double minArea = std::numeric_limits<double>::max();
+	double minVolume = std::numeric_limits<double>::max();
 
-	std::string mArea, mVolume, mD2, mA3;
+	double minBBVolume = std::numeric_limits<double>::max();
+	double minBBLong = std::numeric_limits<double>::max();
+	double minBBMedian = std::numeric_limits<double>::max();
+	double minBBShort = std::numeric_limits<double>::max();
+	double minBBLongShort = std::numeric_limits<double>::max();
+	double minBBMedianShort = std::numeric_limits<double>::max();
+
+	std::string mArea, mVolume, mD2, mA3, mBBVol, mBBL, mBBS, mBBM, mBBLS, mBBMS;
 	//Iterate over each object in the DB
 	while (cursor->more()) {
 		BSONObj p = cursor->next();
@@ -320,6 +328,52 @@ void features::compareToDB(FeatureBag features, mongo::DBClientConnection &c) {
 					minVolume = diffVolume;
 					mVolume = name;
 				}
+			} else if(type == "bb") {
+				double bbVolume = fs[i]["bbVolume"].numberDouble();
+				double bbLong = fs[i]["bbLong"].numberDouble();
+				double bbMedian = fs[i]["bbMedian"].numberDouble();
+				double bbShort = fs[i]["bbShort"].numberDouble();
+				double bbLongShort = fs[i]["bbLongShort"].numberDouble();
+				double bbMedianShort = fs[i]["bbMedianShort"].numberDouble();
+
+				double diffBBVolume = fabs(bbVolume - features.getBBVolume());
+				double diffBBLong = fabs(bbLong - features.getBBLong());
+				double diffBBMedian = fabs(bbMedian - features.getBBMedian());
+				double diffBBShort = fabs(bbShort - features.getBBShort());
+				double diffBBLongShort = fabs(bbLongShort - features.getBBLongShort());
+				double diffBBMedianShort = fabs(bbMedianShort - features.getBBMedianShort());
+
+				cout << "BBVolume: " << bbVolume << endl;
+				cout << "BBLong: " << bbLong << endl;
+				cout << "BBMedian: " << bbMedian << endl;
+				cout << "BBShort: " << bbShort << endl;
+				cout << "BBLongShort: " << bbLongShort << endl;
+				cout << "BBMedianShort: " << bbMedianShort << endl;
+
+				if(diffBBVolume < minBBVolume) {
+					minBBVolume = diffBBVolume;
+					mBBVol = name;
+				}
+				if(diffBBLong < minBBLong) {
+					minBBLong = diffBBLong;
+					mBBL = name;
+				}
+				if(diffBBMedian < minBBMedian) {
+					minBBMedian = diffBBMedian;
+					mBBM = name;
+				}
+				if(diffBBShort < minBBShort) {
+					minBBShort = diffBBShort;
+					mBBS = name;
+				}
+				if(diffBBLongShort < minBBLongShort) {
+					minBBLongShort = diffBBLongShort;
+					mBBLS = name;
+				}
+				if(diffBBMedianShort < minBBMedianShort) {
+					minBBMedianShort = diffBBMedianShort;
+					mBBMS = name;
+				}
 			}
 		}
 		cout << endl;
@@ -327,7 +381,10 @@ void features::compareToDB(FeatureBag features, mongo::DBClientConnection &c) {
 	cout << "Minimal D2: " << mD2 << endl
 	     << "Minimal A3: " << mA3 << endl
 	     << "Minimal Area: " << mArea << endl
-	     << "Minimal Volume: " << mVolume << endl;
+	     << "Minimal Volume: " << mVolume << endl
+	     << "Minimal BB-Volume: " << mBBVol << endl
+	     << "Minimal Long/Short ratio: " << mBBLS << endl
+	     << "Minimal Median/Short ratio: " << mBBMS << endl;
 }
 
 void features::saveToDB(FeatureBag features, std::string name, mongo::DBClientConnection &c) {
