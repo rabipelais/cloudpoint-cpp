@@ -20,6 +20,12 @@ const int MAX_SAMPLES = 100000;
 const int MAX_PAIRS = 100000;
 const int MAX_TRIOS = 100000;
 
+using mongo::BSONArray;
+using mongo::BSONArrayBuilder;
+using mongo::BSONObj;
+using mongo::BSONObjIterator;
+using mongo::BSONElement;
+
 FeatureBag::FeatureBag() {
 
 }
@@ -324,6 +330,32 @@ void features::compareToDB(FeatureBag features, mongo::DBClientConnection &c) {
 	     << "Minimal Volume: " << mVolume << endl;
 }
 
-void features::saveToDB(FeatureBag fs, std::string name, mongo::DBClientConnection &c) {
+void features::saveToDB(FeatureBag features, std::string name, mongo::DBClientConnection &c) {
 	cout << "Saving " << name << " to DB" << endl;
+
+	Features fs = features.features;
+
+	//Set the value array of the histograms
+	BSONArrayBuilder d2Arr;
+	d2Arr.append(fs.d2Histogram);
+
+	BSONArrayBuilder a3Arr;
+	a3Arr.append(fs.a3Histogram);
+
+	//Serialize into BSON object
+	BSONObj p = BSON( mongo::GENOID << "name" << name << "features" <<
+		BSON_ARRAY(
+			BSON("type" << "d2" << "params" << BSON("bins" << (unsigned int)fs.d2Histogram.size())
+			     << "vals" << d2Arr.arr()[0]) <<
+			BSON("type" << "a3" << "params" << BSON("bins" << (unsigned int)fs.a3Histogram.size())
+			     << "vals" << a3Arr.arr()[0]) <<
+			BSON("type" << "ch" << "area" << fs.area << "volume" << fs.volume) <<
+			BSON("type" << "bb" << "bbVolume" << fs.bbVolume << "bbLong" << fs.bbLong
+			     << "bbShort" << fs.bbShort << "bbMedian" << fs.bbMedian
+			     << "bbLongShort" << fs.bbLongShort << "bbMedianShort" << fs.bbMedianShort)
+			)
+		);
+
+	//Insert into DB
+	c.insert("tesis.objects", p);
 }

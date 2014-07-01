@@ -9,11 +9,6 @@
 #include "mongo/client/dbclient.h"
 #include "mongo/bson/bson.h"
 
-using mongo::BSONArray;
-using mongo::BSONObj;
-using mongo::BSONObjIterator;
-using mongo::BSONElement;
-
 struct Features {
 	double area;
 	double volume;
@@ -44,10 +39,10 @@ public:
 	double compareD2(std::vector<double> vals);
 	double compareA3(std::vector<double> vals);
 
+	Features features;
+
 private:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
-
-	Features features;
 
 	void calculateD2(int bins);
 	void calculateA3(int bins);
@@ -56,7 +51,7 @@ private:
 };
 
 namespace features {
-	Features fromBSONObj(BSONObj obj);
+	Features fromBSONObj(mongo::BSONObj obj);
 
 	void compareToDB(FeatureBag features, mongo::DBClientConnection &c);
 	void saveToDB(FeatureBag features, std::string name, mongo::DBClientConnection &c);

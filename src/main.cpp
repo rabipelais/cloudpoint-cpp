@@ -1,4 +1,3 @@
-
 #include <pcl/point_types.h>
 #include <pcl/common/centroid.h>
 
@@ -56,7 +55,7 @@ int main(int argc, char* argv[])
     }
     FeatureBag features(cloud);
     //Save into database
-    if(argc > 1) {
+    if(argc > 2) {
 	    boost::filesystem::path p(fileName);
 	    std::string name = p.stem().string();
 
