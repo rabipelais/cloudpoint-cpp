@@ -6,9 +6,13 @@
 #include <pcl/point_types.h>
 #include <pcl/common/centroid.h>
 
+#include "mongo/client/dbclient.h"
 #include "mongo/bson/bson.h"
 
+using mongo::BSONArray;
 using mongo::BSONObj;
+using mongo::BSONObjIterator;
+using mongo::BSONElement;
 
 struct Features {
 	double area;
@@ -53,6 +57,11 @@ private:
 
 namespace features {
 	Features fromBSONObj(BSONObj obj);
+
+	void compareToDB(FeatureBag features, mongo::DBClientConnection &c);
+	void saveToDB(FeatureBag features, std::string name, mongo::DBClientConnection &c);
+
+
 	std::vector<double> normalize(std::vector<double> x);
 	double compareHistograms(std::vector<double> a, std::vector<double> b);
 }
