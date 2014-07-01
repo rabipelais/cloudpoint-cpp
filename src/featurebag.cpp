@@ -8,6 +8,8 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/surface/convex_hull.h>
 
+#include "gdiam.h"
+
 #include <stdlib.h>
 #include <iostream>
 #include <algorithm>
@@ -30,6 +32,7 @@ FeatureBag::FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 	calculateD2(bins);
 	calculateA3(bins);
 	calculateAreaAndVolume();
+	calculateBB();
 }
 
 FeatureBag::~FeatureBag() {
@@ -162,6 +165,40 @@ void FeatureBag::calculateAreaAndVolume() {
 
 	features.area = cHull.getTotalArea();
 	features.volume = cHull.getTotalVolume();
+}
+
+void FeatureBag::calculateBB() {
+	cout << "Calculating bounding box..." << endl;
+	double eps = 0.005;
+	//Convert to gdiam format
+	int size = cloud->points.size();
+	gdiam_real *tmpVals = new gdiam_real[size * 3];
+	for(int i = 0; i < size * 3; i += 3) {
+		tmpVals[i + 0] = cloud->points[i / 3].x;
+		tmpVals[i + 1] = cloud->points[i / 3].y;
+		tmpVals[i + 2] = cloud->points[i / 3].z;
+	}
+	gdiam_point *tmpPoints = gdiam_convert(tmpVals, size);
+	gdiam_bbox bbox = gdiam_approx_mvbb(tmpPoints, size, eps);
+	bbox.dump();
+
+	double len1 = ( bbbox.high_1 - bbbox.low_1 );
+	double len2 = ( bbbox.high_2 - bbbox.low_2 );
+	double len3 = ( bbbox.high_3 - bbbox.low_3 );
+
+	double l = std::max(len1, std::max(len2, len3));
+	double s = std::min(len1, std::min(len2, len3));
+	double m = len1 * len2 * len3 / (l * s);
+
+	features.bbVolume = bbox.volume();
+	features.bbLong = l;
+	features.bbShort = s;
+	features.bbMedian = m;
+	features.bbLongShort = l/s;
+	features.bbMedianShort = m/s;
+
+	delete[] tmpVals;
+	delete[] tmpPoints;
 }
 
 double FeatureBag::compareD2(std::vector<double> vals) {
