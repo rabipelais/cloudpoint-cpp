@@ -182,9 +182,9 @@ void FeatureBag::calculateBB() {
 	gdiam_bbox bbox = gdiam_approx_mvbb(tmpPoints, size, eps);
 	bbox.dump();
 
-	double len1 = ( bbbox.high_1 - bbbox.low_1 );
-	double len2 = ( bbbox.high_2 - bbbox.low_2 );
-	double len3 = ( bbbox.high_3 - bbbox.low_3 );
+	double len1 = ( bbox.high_1 - bbox.low_1 );
+	double len2 = ( bbox.high_2 - bbox.low_2 );
+	double len3 = ( bbox.high_3 - bbox.low_3 );
 
 	double l = std::max(len1, std::max(len2, len3));
 	double s = std::min(len1, std::min(len2, len3));
