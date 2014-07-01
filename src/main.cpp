@@ -14,8 +14,12 @@ using std::endl;
 
 using mongo::BSONArray;
 using mongo::BSONObj;
+using mongo::BSONObjIterator;
+using mongo::BSONElement;
 
 BSONObj findMatchingObjects(mongo::DBClientConnection &c);
+std::auto_ptr<mongo::DBClientCursor> findObjectsWithFeatures(mongo::DBClientConnection &c);
+void compareToDB(FeatureBag features, mongo::DBClientConnection &c);
 
 int main(int argc, char* argv[])
 {
@@ -39,12 +43,8 @@ int main(int argc, char* argv[])
 
     std::cout << "Loaded "
 	      << cloud->width * cloud->height
-	      << " data points from cube_100000.pcd with the following fields: "
+	      << " data points."
 	      << std::endl;
-    for (size_t i = 0; i < 10; ++i)
-	std::cout << "    " << cloud->points[i].x
-		  << " "    << cloud->points[i].y
-		  << " "    << cloud->points[i].z << std::endl;
 
     mongo::DBClientConnection mongoConnection;
     try {
@@ -54,10 +54,99 @@ int main(int argc, char* argv[])
         cout << "Caught " << e.what() << endl;
         return 1;
     }
-    BSONObj res = findMatchingObjects(mongoConnection);
-    cout << res.toString() << endl;
+    FeatureBag features(cloud);
+    compareToDB(features, mongoConnection);
 }
 
+void compareToDB(FeatureBag features, mongo::DBClientConnection &c) {
+	std::auto_ptr<mongo::DBClientCursor> cursor = findObjectsWithFeatures(c);
+	double minD2 = 100000;
+	double minA3 = 100000;
+	double minArea = 100000;
+	double minVolume = 100000;
+
+	std::string mArea, mVolume, mD2, mA3;
+	//Iterate over each object in the DB
+	while (cursor->more()) {
+		BSONObj p = cursor->next();
+		std::string name = p["name"].toString();
+		cout << "Comparing to " << name << endl;
+		std::vector<BSONElement> fs;
+		//fs will now be an array of features
+		BSONForEach(e, p.getObjectField("features")) {
+			fs.push_back(e);
+		}
+
+		//Iterate over each feature of the DB object
+		//and try to compare it to the new object
+		for(int i = 0; i < fs.size(); i++) {
+			std::string type;
+			fs[i]["type"].Val(type);
+
+			if(type == "d2") {
+				int bins = fs[i]["params"]["bins"].numberInt();
+
+				//Get the values array
+				std::vector<double> vals;
+				BSONForEach(e, fs[i]["vals"].Obj()) {
+					vals.push_back(e.numberDouble());
+				}
+				if(bins == 15) {
+					double diff = features.compareD2(vals);
+					cout << "D2 histogram: " << diff << endl;
+
+					if(diff < minD2) {
+						minD2 = diff;
+						mD2 = name;
+					}
+				}
+			} else if(type == "a3") {
+				int bins = fs[i]["params"]["bins"].numberInt();
+
+				//Get the values array
+				std::vector<double> vals;
+				BSONForEach(e, fs[i]["vals"].Obj()) {
+					vals.push_back(e.numberDouble());
+				}
+				if(bins == 15) {
+					double diff = features.compareA3(vals);
+					cout << "A3 histogram: " << diff << endl;
+
+					if(diff < minA3) {
+						minA3 = diff;
+						mA3 = name;
+					}
+				}
+			} else if(type == "ch") {
+				double area = fs[i]["area"].numberDouble();
+				double volume = fs[i]["volume"].numberDouble();
+				double diffArea = fabs(area - features.getArea());
+				double diffVolume = fabs(volume - features.getVolume());
+				cout << "Area: " << diffArea << endl;
+				cout << "Volume: " << diffVolume << endl;
+
+				if(diffArea < minArea) {
+					minArea = diffArea;
+					mArea = name;
+				}
+				if(diffVolume < minVolume) {
+					minVolume = diffVolume;
+					mVolume = name;
+				}
+			}
+		}
+		cout << endl;
+	}
+	cout << "Minimal D2: " << mD2 << endl
+	     << "Minimal A3: " << mA3 << endl
+	     << "Minimal Area: " << mArea << endl
+	     << "Minimal Volume: " << mVolume << endl;
+}
+
+std::auto_ptr<mongo::DBClientCursor> findObjectsWithFeatures(mongo::DBClientConnection &c) {
+	std::auto_ptr<mongo::DBClientCursor> cursor = c.query("tesis.objects", QUERY("features" << BSON("$exists" << true)));
+	return cursor;
+}
 
 BSONObj findMatchingObjects(mongo::DBClientConnection &c) {
 	std::string feature = "d2";
