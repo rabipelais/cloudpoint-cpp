@@ -1,4 +1,5 @@
 #include "featurebag.hpp"
+#include "convexHull.hpp"
 
 #include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree_flann.h>

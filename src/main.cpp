@@ -5,7 +5,9 @@
 #include "mongo/bson/bson.h"
 #include <iostream>
 #include <stdio.h>
+
 #include "boost/filesystem.hpp"
+#include <Eigen/Core>
 
 #include "featurebag.hpp"
 
@@ -35,8 +37,10 @@ int main(int argc, char* argv[])
 	}
 
 	float x, y, z;
+	std::vector<Eigen::Vector3f> points;
 	while(fscanf(pFile, "%e %e %e", &x, &y, &z) != EOF) {
 		cloud->push_back(pcl::PointXYZ(x, y, z));
+		points.push_back(Eigen::Vector3f(x, y, z));
 	}
 
 
