@@ -28,7 +28,7 @@ struct Features {
 class FeatureBag {
 public:
 	FeatureBag();
-	FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<Eigen::Vector3f>& points);
+	FeatureBag(const std::vector<Eigen::Vector3f>& points);
 	~FeatureBag();
 
 

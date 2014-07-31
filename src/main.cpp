@@ -1,6 +1,3 @@
-#include <pcl/point_types.h>
-#include <pcl/common/centroid.h>
-
 #include "mongo/client/dbclient.h"
 #include "mongo/bson/bson.h"
 #include <iostream>
@@ -25,7 +22,6 @@ std::auto_ptr<mongo::DBClientCursor> findObjectsWithFeatures(mongo::DBClientConn
 
 int main(int argc, char* argv[])
 {
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
 	if(argc < 1) return 1;
 	std::string fileName = argv[1];
 
@@ -40,7 +36,6 @@ int main(int argc, char* argv[])
 	float x, y, z;
 	std::vector<Eigen::Vector3f> points;
 	while(fscanf(pFile, "%e %e %e", &x, &y, &z) != EOF) {
-		cloud->push_back(pcl::PointXYZ(x, y, z));
 		points.push_back(Eigen::Vector3f(x, y, z));
 	}
 
@@ -48,7 +43,7 @@ int main(int argc, char* argv[])
 	Convex::convexHull<Eigen::Vector3f>(points);
 
     std::cout << "Loaded "
-	      << cloud->width * cloud->height
+	      << points.size()
 	      << " data points."
 	      << std::endl;
 
@@ -60,13 +55,13 @@ int main(int argc, char* argv[])
         cout << "Caught " << e.what() << endl;
         return 1;
     }
-    FeatureBag features(cloud, points);
+    FeatureBag features(points);
     //Save into database
     if(argc > 2) {
 	    boost::filesystem::path p(fileName);
 	    std::string name = p.stem().string();
 
-	    features::saveToDB(features, name, mongoConnection);
+	    //features::saveToDB(features, name, mongoConnection);
     } else {
 	    //Else, compare to DB
 	    features::compareToDB(features, mongoConnection);

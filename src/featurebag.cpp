@@ -1,14 +1,6 @@
 #include "featurebag.hpp"
 #include "convexHull.hpp"
 
-#include <pcl/features/normal_3d.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/common/centroid.h>
-#include <pcl/point_types.h>
-#include <pcl/features/integral_image_normal.h>
-#include <pcl/visualization/cloud_viewer.h>
-#include <pcl/surface/convex_hull.h>
-
 #include "gdiam.h"
 #include "point.hpp"
 
@@ -33,8 +25,8 @@ FeatureBag::FeatureBag() {
 
 }
 
-FeatureBag::FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<Eigen::Vector3f>& points)
-	: cloud(cloud), points(points), features()
+FeatureBag::FeatureBag(const std::vector<Eigen::Vector3f>& points)
+	: points(points), features()
 {
 	int bins = 15;
 	//Calculate features
@@ -133,17 +125,17 @@ void FeatureBag::calculateA3(int bins) {
 }
 
 void FeatureBag::calculateAreaAndVolume() {
-	cout << "Calculating area and volume..." << endl;
-	pcl::ConvexHull<pcl::PointXYZ> cHull;
-	pcl::PointCloud<pcl::PointXYZ> cHull_points;
-	cHull.setComputeAreaVolume(true);
-	std::vector<pcl::Vertices> polygons;
+	// cout << "Calculating area and volume..." << endl;
+	// pcl::ConvexHull<pcl::PointXYZ> cHull;
+	// pcl::PointCloud<pcl::PointXYZ> cHull_points;
+	// cHull.setComputeAreaVolume(true);
+	// std::vector<pcl::Vertices> polygons;
 
-	cHull.setInputCloud(cloud);
-	cHull.reconstruct (cHull_points, polygons);
+	// cHull.setInputCloud(cloud);
+	// cHull.reconstruct (cHull_points, polygons);
 
-	features.area = cHull.getTotalArea();
-	features.volume = cHull.getTotalVolume();
+	// features.area = cHull.getTotalArea();
+	// features.volume = cHull.getTotalVolume();
 }
 
 void FeatureBag::calculateBB() {
