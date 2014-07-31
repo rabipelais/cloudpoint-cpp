@@ -39,8 +39,7 @@ int main(int argc, char* argv[])
 		points.push_back(Eigen::Vector3f(x, y, z));
 	}
 
-	//Test
-	Convex::convexHull<Eigen::Vector3f>(points);
+	//Convex::convexHull<Eigen::Vector3f>(points);
 
     std::cout << "Loaded "
 	      << points.size()

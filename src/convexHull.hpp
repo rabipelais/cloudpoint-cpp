@@ -178,29 +178,31 @@ public:
 		pn->val = p;
 		pn->flist.push_back(fn);
 		fn->plist.push_back(pn);
-		pnodes.push_back(pn);
+		mPNodes.push_back(pn);
 		return pn;
 	}
 
 	FNode* addFNode(F* f) {
 		FNode* fn = new FNode;
 		fn->val = f;
-		fnodes.push_back(fn);
+		mFNodes.push_back(fn);
 		return fn;
 	}
 
 	~ConflictGraph() {
-		for(auto f : fnodes) {
+		for(auto f : mFNodes) {
 			delete f;
 		}
-		for(auto p : pnodes) {
+		for(auto p : mPNodes) {
 			delete p;
 		}
 	}
 
+	std::vector<PNode *> pNodes() {return mPNodes;}
+	std::vector<FNode *> fNodes() {return mFNodes;}
 private:
-	std::vector<FNode*> fnodes;
-	std::vector<PNode*> pnodes;
+	std::vector<FNode*> mFNodes;
+	std::vector<PNode*> mPNodes;
 };
 
 
@@ -243,6 +245,7 @@ namespace Convex {
 		}
 
 		ConvexHull<Point> CH;
+		//TODO make sure the orientation is correct
 		CH.addTetrahedron(p1, p2, p3, p4);
 
 		auto faces = CH.faces();
@@ -260,11 +263,23 @@ namespace Convex {
 			}
 		}
 
-		while(!remaining.empty()) {
-			Point* p = remaining.back();
-			remaining.pop_back();
-		}
+		//Now we only have to iterate over the Point Nodes of the conflict graph,
+		//because all other points have no visible faces, therefore lie inside the CH
+		for(auto pn : conflicts.pNodes()) {
+			//Make sure it has visible faces, else ignore
+			if(!pn->flist.empty()) {
+				//Now find the horizon based on the visible faces
 
+				//Iterate over the horizon edges
+
+				//For each one create the new triangular facet to the point
+
+				/* For the new face determine the conflicts by testing the
+				 * union of points of P(f1) and P(f2), where f1 and f2 are
+				 * the (old) faces of the current edge.
+				 */
+			}
+		}
 		return CH;
 	}
 }

@@ -125,7 +125,7 @@ void FeatureBag::calculateA3(int bins) {
 }
 
 void FeatureBag::calculateAreaAndVolume() {
-	// cout << "Calculating area and volume..." << endl;
+	cout << "==NOT== Calculating area and volume..." << endl;
 	// pcl::ConvexHull<pcl::PointXYZ> cHull;
 	// pcl::PointCloud<pcl::PointXYZ> cHull_points;
 	// cHull.setComputeAreaVolume(true);
@@ -136,6 +136,8 @@ void FeatureBag::calculateAreaAndVolume() {
 
 	// features.area = cHull.getTotalArea();
 	// features.volume = cHull.getTotalVolume();
+	features.area = 0.0;
+	features.volume = 0.0;
 }
 
 void FeatureBag::calculateBB() {
