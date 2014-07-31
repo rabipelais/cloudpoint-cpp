@@ -4,12 +4,14 @@
 #include "point.hpp"
 
 #include <vector>
-#include <stack>
 #include <iostream>
 #include <cassert>
 
-template<typename T>
+
+template<class T>
 class DoublyLinkedEdgeList {
+public:
+
 	struct Face;
 
 	struct HalfEdge {
@@ -25,7 +27,6 @@ class DoublyLinkedEdgeList {
 		std::vector<HalfEdge*> innerComponents;
 	};
 
-public:
 	~DoublyLinkedEdgeList() {
 		for(HalfEdge* e : mHalfEdges) {
 			delete e;
@@ -34,6 +35,25 @@ public:
 			delete f;
 		}
 	}
+
+	std::vector<Face *> faces() {return mFaces;}
+	/*
+	 * Check if the face f is visible from point p
+	 */
+	static bool visible(const Face* f, const T& p) {
+		HalfEdge* a = f->outerComponent;
+		HalfEdge* b = a->next;
+		HalfEdge* c = b->next;
+
+		T x = sub(*b->origin, *a->origin);
+		T y = sub(*c->origin, *a->origin);
+		T n = cross(x, y);
+
+		//The triangle is only visible if the product of the
+		//normal and P - A is positive, i.e. smaller than 90 degs.
+		return dot(n, sub(p, *(a->origin))) >= 0;
+	}
+
 	/*
 	 * Assume the first three vertices are already in CCW fashion
 	 * when looking at the base from the bottom, i.e. the border
@@ -150,7 +170,7 @@ namespace Convex {
 	template<class Point>
 	ConvexHull<Point> convexHull(const std::vector<Point>& points) {
 		//Try to find four non-coplanar points, and remove them from the points to be processed
-		std::stack<Point> remaining;
+		std::vector<Point> remaining;
 		Point p1 = points[0];
 		Point p2 = points[1];
 		Point p3, p4;
@@ -163,7 +183,7 @@ namespace Convex {
 				p3 = p;
 				break;
 			}
-			remaining.push(p);
+			remaining.push_back(p);
 		}
 
 		//No more points left :( should output something better TODO
@@ -176,11 +196,28 @@ namespace Convex {
 				p4 = p;
 				break;
 			}
-			remaining.push(p);
+			remaining.push_back(p);
 		}
 
 		ConvexHull<Point> CH;
 		CH.addTetrahedron(p1, p2, p3, p4);
+
+		auto faces = CH.faces();
+
+		//Create conflict graph
+		std::vector<std::vector<typename DoublyLinkedEdgeList<Point>::Face*> > conflicts(remaining.size());
+		auto it = conflicts.begin();
+		for(auto p : remaining) {
+			for(auto f : faces) {
+				//Push the faces NOT visible from each point
+				if(!DoublyLinkedEdgeList<Point>::visible(f, p)) {
+					it->push_back(f);
+				}
+			}
+			it++;
+		}
+
+
 
 		return CH;
 	}
