@@ -160,6 +160,48 @@ private:
 };
 
 
+template<typename P, typename F>
+class ConflictGraph {
+public:
+	struct FNode;
+	struct PNode {
+		P* val;
+		std::vector<FNode*> flist;
+	};
+	struct FNode {
+		F* val;
+		std::vector<PNode*> plist;
+	};
+
+	PNode* addPNode(P* p, FNode* fn) {
+		PNode *pn = new PNode;
+		pn->val = p;
+		pn->flist.push_back(fn);
+		fn->plist.push_back(pn);
+		pnodes.push_back(pn);
+		return pn;
+	}
+
+	FNode* addFNode(F* f) {
+		FNode* fn = new FNode;
+		fn->val = f;
+		fnodes.push_back(fn);
+		return fn;
+	}
+
+	~ConflictGraph() {
+		for(auto f : fnodes) {
+			delete f;
+		}
+		for(auto p : pnodes) {
+			delete p;
+		}
+	}
+
+private:
+	std::vector<FNode*> fnodes;
+	std::vector<PNode*> pnodes;
+};
 
 
 template<typename T>
@@ -168,22 +210,23 @@ using ConvexHull = DoublyLinkedEdgeList<T>;
 namespace Convex {
 
 	template<class Point>
-	ConvexHull<Point> convexHull(const std::vector<Point>& points) {
+	ConvexHull<Point> convexHull(std::vector<Point>& points) {
 		//Try to find four non-coplanar points, and remove them from the points to be processed
-		std::vector<Point> remaining;
-		Point p1 = points[0];
-		Point p2 = points[1];
-		Point p3, p4;
+		std::vector<Point*> remaining;
+		Point& p1 = points[0];
+		Point& p2 = points[1];
+		Point& p3 = p1;
+		Point& p4 = p1;
 
 		unsigned int i = 2;
 		//First find the first non-collinear point to p1 and p2
 		for(; i < points.size(); i++) {
-			Point p = points[i];
+			Point& p = points[i];
 			if(!collinear(p1, p2, p)) {
 				p3 = p;
 				break;
 			}
-			remaining.push_back(p);
+			remaining.push_back(&p);
 		}
 
 		//No more points left :( should output something better TODO
@@ -191,12 +234,12 @@ namespace Convex {
 
 		//Now, go on to find the other point of the tetrahedron
 		for(; i < points.size(); i++) {
-			Point p = points[i];
+			Point& p = points[i];
 			if(!coplanar(p1, p2, p3, p)) {
 				p4 = p;
 				break;
 			}
-			remaining.push_back(p);
+			remaining.push_back(&p);
 		}
 
 		ConvexHull<Point> CH;
@@ -205,19 +248,22 @@ namespace Convex {
 		auto faces = CH.faces();
 
 		//Create conflict graph
-		std::vector<std::vector<typename DoublyLinkedEdgeList<Point>::Face*> > conflicts(remaining.size());
-		auto it = conflicts.begin();
-		for(auto p : remaining) {
-			for(auto f : faces) {
-				//Push the faces NOT visible from each point
-				if(!DoublyLinkedEdgeList<Point>::visible(f, p)) {
-					it->push_back(f);
+		//std::vector<std::vector<typename DoublyLinkedEdgeList<Point>::Face*> > conflicts;
+		ConflictGraph<Point, typename DoublyLinkedEdgeList<Point>::Face> conflicts;
+		for(auto f : faces) {
+			auto fn = conflicts.addFNode(f);
+			for(auto p : remaining) {
+				//Push the faces that ARE visible from each point
+				if(DoublyLinkedEdgeList<Point>::visible(f, *p)) {
+					conflicts.addPNode(p, fn);
 				}
 			}
-			it++;
 		}
 
-
+		while(!remaining.empty()) {
+			Point* p = remaining.back();
+			remaining.pop_back();
+		}
 
 		return CH;
 	}
