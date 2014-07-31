@@ -2,6 +2,7 @@
 #define FEATUREBAG_HPP
 
 #include <vector>
+#include <Eigen/Core>
 
 #include <pcl/point_types.h>
 #include <pcl/common/centroid.h>
@@ -27,7 +28,7 @@ struct Features {
 class FeatureBag {
 public:
 	FeatureBag();
-	FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+	FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<Eigen::Vector3f>& points);
 	~FeatureBag();
 
 
@@ -50,6 +51,7 @@ public:
 
 private:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
+	std::vector<Eigen::Vector3f> points;
 
 	void calculateD2(int bins);
 	void calculateA3(int bins);

@@ -10,6 +10,7 @@
 #include <pcl/surface/convex_hull.h>
 
 #include "gdiam.h"
+#include "point.hpp"
 
 #include <stdlib.h>
 #include <iostream>
@@ -32,8 +33,8 @@ FeatureBag::FeatureBag() {
 
 }
 
-FeatureBag::FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
-	: cloud(cloud), features()
+FeatureBag::FeatureBag(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<Eigen::Vector3f>& points)
+	: cloud(cloud), points(points), features()
 {
 	int bins = 15;
 	//Calculate features
@@ -57,39 +58,9 @@ std::vector<double> makeHistogram(int bins, std::vector<double> values) {
 	return histogram;
 }
 
-double distance(pcl::PointXYZ a, pcl::PointXYZ b) {
-	return sqrt(std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2) + std::pow(a.z - b.z, 2));
-}
-
-double norm(pcl::PointXYZ a) {
-	return sqrt(std::pow(a.x, 2) + std::pow(a.y, 2) + std::pow(a.z, 2));
-}
-
-double dot(pcl::PointXYZ a, pcl::PointXYZ b) {
-	return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-pcl::PointXYZ sub(pcl::PointXYZ a, pcl::PointXYZ b){
-	pcl::PointXYZ c;
-	c.x = a.x - b.x;
-	c.y = a.y - b.y;
-	c.z = a.z - b.z;
-	return c;
-}
-
-double angle(pcl::PointXYZ a, pcl::PointXYZ b, pcl::PointXYZ c) {
-	pcl::PointXYZ v1 = sub(a, b);
-	pcl::PointXYZ v2 = sub(c, b);
-	double d1 = norm(v1);
-	double d2 = norm(v2);
-	double prod = dot(v1, v2);
-
-	return std::max(0.0, acos(prod / (d1 * d2)));
-}
-
 void FeatureBag::calculateD2(int bins) {
 	cout << "Calculating D2..." << endl;
-	int numPoints = cloud->points.size();
+	int numPoints = points.size();
 	std::vector<int> indices = std::vector<int>(std::min(numPoints, MAX_SAMPLES));
 
 	if(numPoints < MAX_SAMPLES) {
@@ -116,14 +87,14 @@ void FeatureBag::calculateD2(int bins) {
 			second = rand() % numIndices;
 		} while(first == second);
 		//Calculate the distance
-		distances[i] = distance(cloud->points[indices[first]], cloud->points[indices[second]]);
+		distances[i] = distance(points[indices[first]], points[indices[second]]);
 	}
 	features.d2Histogram = makeHistogram(bins, distances);
 }
 
 void FeatureBag::calculateA3(int bins) {
 	cout << "Calculating A3..." << endl;
-	int numPoints = cloud->points.size();
+	int numPoints = points.size();
 	std::vector<int> indices = std::vector<int>(std::min(numPoints, MAX_SAMPLES));
 
 	if(numPoints < MAX_SAMPLES) {
@@ -156,7 +127,7 @@ void FeatureBag::calculateA3(int bins) {
 		} while(first == third || second == third);
 
 		//Calculate the angle
-		angles[i] = angle(cloud->points[indices[first]], cloud->points[indices[second]], cloud->points[indices[third]]);
+		angles[i] = angle(points[indices[first]], points[indices[second]], points[indices[third]]);
 	}
 	features.a3Histogram = makeHistogram(bins, angles);
 }
@@ -179,12 +150,12 @@ void FeatureBag::calculateBB() {
 	cout << "Calculating bounding box..." << endl;
 	double eps = 0.005;
 	//Convert to gdiam format
-	int size = cloud->points.size();
+	int size = points.size();
 	gdiam_real *tmpVals = new gdiam_real[size * 3];
 	for(int i = 0; i < size * 3; i += 3) {
-		tmpVals[i + 0] = cloud->points[i / 3].x;
-		tmpVals[i + 1] = cloud->points[i / 3].y;
-		tmpVals[i + 2] = cloud->points[i / 3].z;
+		tmpVals[i + 0] = points[i / 3][0];
+		tmpVals[i + 1] = points[i / 3][1];
+		tmpVals[i + 2] = points[i / 3][2];
 	}
 	gdiam_point *tmpPoints = gdiam_convert(tmpVals, size);
 	gdiam_bbox bbox = gdiam_approx_mvbb(tmpPoints, size, eps);

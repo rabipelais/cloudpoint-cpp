@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 
 #include "featurebag.hpp"
+#include "convexHull.hpp"
 
 using std::cout;
 using std::endl;
@@ -43,6 +44,8 @@ int main(int argc, char* argv[])
 		points.push_back(Eigen::Vector3f(x, y, z));
 	}
 
+	//Test
+	Convex::convexHull<Eigen::Vector3f>(points);
 
     std::cout << "Loaded "
 	      << cloud->width * cloud->height
@@ -57,7 +60,7 @@ int main(int argc, char* argv[])
         cout << "Caught " << e.what() << endl;
         return 1;
     }
-    FeatureBag features(cloud);
+    FeatureBag features(cloud, points);
     //Save into database
     if(argc > 2) {
 	    boost::filesystem::path p(fileName);
