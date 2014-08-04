@@ -37,6 +37,7 @@ public:
 	}
 
 	std::vector<Face *> faces() {return mFaces;}
+
 	/*
 	 * Check if the face f is visible from point p
 	 */
@@ -58,7 +59,7 @@ public:
      * Add a CCW triangular face, where e is the base and p the
      * opposite point.
      */
-    void addFace(HalfEdge* e, T* p) {
+    Face* addFace(HalfEdge* e, T* p) {
         Face* f = new Face();
         f->outerComponent = e;
         HalfEdge* ep = new HalfEdge();
@@ -87,6 +88,7 @@ public:
         assert(pe->next->incidentFace == pe->incidentFace);
 
         assert(f->outerComponent->incidentFace == f);
+        return f;
     }
 
 	/*
@@ -124,11 +126,14 @@ public:
 		mHalfEdges.push_back(ac);
 
 		base->outerComponent = ab;
-		mFaces.push_back(base);
 
 		//Link the edges
 		ab->next = bc; bc->next = ca; ca->next = ab;
 		ab->prev = ca; bc->prev = ab; ca->prev = bc;
+
+		mFaces.push_back(base);
+
+		assert(!DoublyLinkedEdgeList<T>::visible(base, d));
 
 		//Create the edges from the point
 		HalfEdge* bd = new HalfEdge();
@@ -305,22 +310,74 @@ namespace Convex {
 		}
 
 		//Now we only have to iterate over the Point Nodes of the conflict graph,
-		//because all other points have no visible faces, therefore lie inside the CH
-		for(auto pn : conflicts.pNodes()) {
-			//Make sure it has visible faces, else ignore
-			if(!pn->flist.empty()) {
-				//Now find the horizon based on the visible faces
+        //because all other points have no visible faces, therefore lie inside the CH
+        for(auto pn : conflicts.pNodes()) {
+            //Make sure it has visible faces, else ignore
+            if(!pn->flist.empty()) {
+                //Now find the horizon based on the visible faces
+                std::vector<typename DoublyLinkedEdgeList<Point>::HalfEdge*> horizon;
+                for(auto fn : pn->flist) {
+                    //Find border edge, i.e. not visible from p
+                    typename DoublyLinkedEdgeList<Point>::HalfEdge* e = fn->val->outerComponent;
+                    do {
+                        if(!DoublyLinkedEdgeList<Point>::visible(e->twin->incidentFace, *pn->val)) {
+	                        horizon.push_back(e);
+                            break;
+                        } else {
+                            e = e->next;
+                        }
+                    } while (e != fn->val->outerComponent); //Quit if we do a whole round trip around the face
+                }
 
-				//Iterate over the horizon edges
+                //Iterate over the horizon edges
+                //Save the last one so that we can go around the horizon
+                auto prev = horizon.back();
+                CH.addFace(prev, pn->val);
+                for(auto e : horizon) {
+                    if(e != horizon.back()) {
+	                    //Old incident faces
+	                    auto f1 = e->twin->incidentFace;
+	                    auto f2 = e->incidentFace;
 
-				//For each one create the new triangular facet to the point
+                        //For each one create the new triangular facet to the point
+                        auto f = CH.addFace(e, pn->val);
 
-				/* For the new face determine the conflicts by testing the
-				 * union of points of P(f1) and P(f2), where f1 and f2 are
-				 * the (old) faces of the current edge.
-				 */
-			}
-		}
+                        //Assume you are going in CCW order?
+                        assert(prev->twin->origin == e->origin);
+
+                        //Link to the prev face
+                        prev->next->twin = e->prev;
+                        e->prev->twin = prev->next;
+
+                        prev = e;
+
+                        /* For the new face determine the conflicts by testing the
+                         * union of points of P(f1) and P(f2), where f1 and f2 are
+                         * the (old) faces of the current edge.
+                         */
+                        //Get the conflict face node of the faces. TODO more efficient
+                        auto fn1 = std::find(pn->flist.begin(), pn->flist.end(), f1);
+                        auto fn2 = std::find(pn->flist.begin(), pn->flist.end(), f2);
+
+                        //Now get their conflict lists
+                        auto pointsFromF1 = fn1->plist;
+                        auto pointsFromF2 = fn2->plist;
+                        //Check if the face is visible from the point
+                        for(auto pf1 : pointsFromF1) {
+	                        if(DoublyLinkedEdgeList<Point>::visible(f1, pf1->val)) {
+
+	                        }
+                        }
+
+                    } else {
+	                    //Went through the whole horizon, join the start and the end,
+	                    //but don't create a new face
+                        prev->next->twin = e->prev;
+                        e->prev->twin = prev->next;
+                    }
+                }
+            }
+        }
 		return CH;
 	}
 }
