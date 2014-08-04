@@ -251,15 +251,15 @@ namespace Convex {
 	ConvexHull<Point> convexHull(std::vector<Point>& points) {
 		//Try to find four non-coplanar points, and remove them from the points to be processed
 		std::vector<Point*> remaining;
-		Point& p1 = points[0];
-		Point& p2 = points[1];
-		Point& p3 = p1;
-		Point& p4 = p1;
+		Point p1 = points[0];
+		Point p2 = points[1];
+		Point p3 = p1;
+		Point p4 = p1;
 
 		unsigned int i = 2;
 		//First find the first non-collinear point to p1 and p2
 		for(; i < points.size(); i++) {
-			Point& p = points[i];
+			Point p = points[i];
 			if(!collinear(p1, p2, p)) {
 				p3 = p;
 				break;
@@ -272,7 +272,7 @@ namespace Convex {
 
 		//Now, go on to find the other point of the tetrahedron
 		for(; i < points.size(); i++) {
-			Point& p = points[i];
+			Point p = points[i];
 			if(!coplanar(p1, p2, p3, p)) {
 				p4 = p;
 				break;
@@ -281,8 +281,13 @@ namespace Convex {
 		}
 
 		ConvexHull<Point> CH;
-		//TODO make sure the orientation is correct
-		CH.addTetrahedron(p1, p2, p3, p4);
+		//Check if the tetrahedron would be properly oriented
+		if(!inFront(p1, p2, p3, p4)) {
+			CH.addTetrahedron(p1, p2, p3, p4);
+		} else {
+			//Change the orientation of the base
+			CH.addTetrahedron(p2, p1, p3, p4);
+		}
 
 		auto faces = CH.faces();
 

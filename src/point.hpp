@@ -47,6 +47,16 @@ bool coplanar(const Point& p1, const Point& p2, const Point& p3, const Point& p4
 }
 
 template<class Point>
+bool inFront(const Point& p1, const Point& p2, const Point& p3, const Point& p4) {
+	Point x = sub(p2, p1);
+	Point y = sub(p3, p1);
+	Point n = cross(x, y);
+
+	return dot(n, sub(p4, p1)) >= 0;
+}
+
+
+template<class Point>
 double distance(const Point& a, const Point& b) {
 	return sqrt(std::pow(a[0] - b[0], 2) + std::pow(a[1] - b[1], 2) + std::pow(a[2] - b[2], 2));
 }
