@@ -120,8 +120,8 @@ public:
 		//Now the other faces
 		Face* bad = new Face();
 		ba->incidentFace = db->incidentFace = ad->incidentFace = bad;
-		ba->next = ad; ad->next = db->next = ba;
-		ba->prev = db; db->prev = ad->prev = ba;
+		ba->next = ad; ad->next = db; db->next = ba;
+		ba->prev = db; db->prev = ad; ad->prev = ba;
 		bad->outerComponent = ba;
 		mFaces.push_back(bad);
 
@@ -141,14 +141,15 @@ public:
 
 		//Now try to make sense of this mess
 		for(Face* f : mFaces) {
-			assert(f->outerComponent->incidentFace = f);
+			assert(f->outerComponent->incidentFace == f);
 		}
+		int i = 0;
 		for(HalfEdge* e : mHalfEdges) {
-			assert(e->prev->next = e);
-			assert(e->next->prev = e);
-			assert(e->twin->twin = e);
-			assert(e->twin->next->origin = e->origin);
-			assert(e->prev->twin->origin = e->origin);
+			assert(e->prev->next == e);
+			assert(e->next->prev == e);
+			assert(e->twin->twin == e);
+			assert(e->twin->next->origin == e->origin);
+			assert(e->prev->twin->origin == e->origin);
 			assert(e->prev->incidentFace == e->incidentFace);
 			assert(e->next->incidentFace == e->incidentFace);
 		}
