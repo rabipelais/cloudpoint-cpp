@@ -54,6 +54,41 @@ public:
 		return dot(n, sub(p, *(a->origin))) >= 0;
 	}
 
+     /*
+     * Add a CCW triangular face, where e is the base and p the
+     * opposite point.
+     */
+    void addFace(HalfEdge* e, T* p) {
+        Face* f = new Face();
+        f->outerComponent = e;
+        HalfEdge* ep = new HalfEdge();
+        HalfEdge* pe = new HalfEdge();
+        ep->origin = e->twin->origin;
+        pe->origin = p;
+        ep->incidentFace = pe->incidentFace = e->incidentFace = f;
+        e->next = ep; ep->next = pe; pe->next = e;
+        e->prev = pe; pe->prev = ep; ep->prev = e;
+
+        //Note that here we don't use the `twin->origin` tests
+        assert(e->prev->next == e);
+        assert(e->next->prev == e);
+        assert(e->twin->twin == e);
+        assert(e->prev->incidentFace == e->incidentFace);
+        assert(e->next->incidentFace == e->incidentFace);
+
+        assert(ep->prev->next == ep);
+        assert(ep->next->prev == ep);
+        assert(ep->prev->incidentFace == ep->incidentFace);
+        assert(ep->next->incidentFace == ep->incidentFace);
+
+        assert(pe->prev->next == pe);
+        assert(pe->next->prev == pe);
+        assert(pe->prev->incidentFace == pe->incidentFace);
+        assert(pe->next->incidentFace == pe->incidentFace);
+
+        assert(f->outerComponent->incidentFace == f);
+    }
+
 	/*
 	 * Assume the first three vertices are already in CCW fashion
 	 * when looking at the base from the bottom, i.e. the border
