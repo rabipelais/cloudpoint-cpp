@@ -25,6 +25,8 @@ public:
 	struct Face {
 		HalfEdge* outerComponent; //The face lies on the left of the edge
 		std::vector<HalfEdge*> innerComponents;
+		std::vector<T*> visiblePoints;
+		T* lastVisitedBy;
 	};
 
 	~DoublyLinkedEdgeList() {
@@ -53,6 +55,14 @@ public:
 		//The triangle is only visible if the product of the
 		//normal and P - A is positive, i.e. smaller than 90 degs.
 		return dot(n, sub(p, *(a->origin))) >= 0;
+	}
+
+	/*
+	 * (Positive) distance from a point to a face
+	 */
+	static double distance(const Face* f, const T& p) {
+		//TODO STUB
+		return norm(sub(*(f->outerComponent->origin), p));
 	}
 
      /*
@@ -200,60 +210,22 @@ private:
 	std::vector<Face*> mFaces;
 };
 
-
-template<typename P, typename F>
-class ConflictGraph {
-public:
-	struct FNode;
-	struct PNode {
-		P* val;
-		std::vector<FNode*> flist;
-	};
-	struct FNode {
-		F* val;
-		std::vector<PNode*> plist;
-	};
-
-	PNode* addPNode(P* p, FNode* fn) {
-		PNode *pn = new PNode;
-		pn->val = p;
-		pn->flist.push_back(fn);
-		fn->plist.push_back(pn);
-		mPNodes.push_back(pn);
-		return pn;
-	}
-
-	FNode* addFNode(F* f) {
-		FNode* fn = new FNode;
-		fn->val = f;
-		mFNodes.push_back(fn);
-		return fn;
-	}
-
-	~ConflictGraph() {
-		for(auto f : mFNodes) {
-			delete f;
-		}
-		for(auto p : mPNodes) {
-			delete p;
-		}
-	}
-
-	std::vector<PNode *> pNodes() {return mPNodes;}
-	std::vector<FNode *> fNodes() {return mFNodes;}
-private:
-	std::vector<FNode*> mFNodes;
-	std::vector<PNode*> mPNodes;
-};
-
-
 template<typename T>
 using ConvexHull = DoublyLinkedEdgeList<T>;
 
 namespace Convex {
 
+	/*
+	 * Implementation based on the QuickHull algorithm. The idea is to assign to each face of
+	 * the CH the points from which it is visible. If this list is non-empty, this face should
+	 * not be on the CH, and has to be processed. The faces are put on a stack. For each face on
+	 * the stack, a cone is built from the furthest point and its horizon edges. The points
+	 * visible from the old faces are reassigned to the new faces.
+	 */
 	template<class Point>
 	ConvexHull<Point> convexHull(std::vector<Point>& points) {
+		const double eps = 0.0001;
+
 		//Try to find four non-coplanar points, and remove them from the points to be processed
 		std::vector<Point*> remaining;
 		Point p1 = points[0];
@@ -294,90 +266,105 @@ namespace Convex {
 			CH.addTetrahedron(p2, p1, p3, p4);
 		}
 
-		auto faces = CH.faces();
+		auto facesStack = CH.faces();
+		assert(facesStack.size() == 4);
 
-		//Create conflict graph
-		//std::vector<std::vector<typename DoublyLinkedEdgeList<Point>::Face*> > conflicts;
-		ConflictGraph<Point, typename DoublyLinkedEdgeList<Point>::Face> conflicts;
-		for(auto f : faces) {
-			auto fn = conflicts.addFNode(f);
-			for(auto p : remaining) {
-				//Push the faces that ARE visible from each point
-				if(DoublyLinkedEdgeList<Point>::visible(f, *p)) {
-					conflicts.addPNode(p, fn);
+		//Assign points to the face that is closest
+		for(int p = 0; p < points.size(); p++) {
+			bool visible = false;
+			double d = std::numeric_limits<double>::max();
+			typename ConvexHull<Point>::Face* closestFace = NULL;
+			//Find closest face
+			for(auto f : facesStack) {
+				double distance = ConvexHull<Point>::distance(f, points.at(p));
+				if(ConvexHull<Point>::visible(f, points.at(p)) && distance > eps) {
+					if(distance < d) {
+						d = distance;
+						visible = true;
+						closestFace = f;
+					}
 				}
+			}
+			if(visible) {
+				closestFace->visiblePoints.push_back(&(points.at(p)));
 			}
 		}
 
-		//Now we only have to iterate over the Point Nodes of the conflict graph,
-        //because all other points have no visible faces, therefore lie inside the CH
-        for(auto pn : conflicts.pNodes()) {
-            //Make sure it has visible faces, else ignore
-            if(!pn->flist.empty()) {
-                //Now find the horizon based on the visible faces
-                std::vector<typename DoublyLinkedEdgeList<Point>::HalfEdge*> horizon;
-                for(auto fn : pn->flist) {
-                    //Find border edge, i.e. not visible from p
-                    typename DoublyLinkedEdgeList<Point>::HalfEdge* e = fn->val->outerComponent;
-                    do {
-                        if(!DoublyLinkedEdgeList<Point>::visible(e->twin->incidentFace, *pn->val)) {
-	                        horizon.push_back(e);
-                            break;
-                        } else {
-                            e = e->next;
-                        }
-                    } while (e != fn->val->outerComponent); //Quit if we do a whole round trip around the face
-                }
+		//Process the stack of facets
+		while(!facesStack.empty()) {
+			std::cout << "Processing face" << std::endl;
+			auto currentFace = facesStack.back();
+			facesStack.pop_back();
 
-                //Iterate over the horizon edges
-                //Save the last one so that we can go around the horizon
-                auto prev = horizon.back();
-                CH.addFace(prev, pn->val);
-                for(auto e : horizon) {
-                    if(e != horizon.back()) {
-	                    //Old incident faces
-	                    auto f1 = e->twin->incidentFace;
-	                    auto f2 = e->incidentFace;
+			//Find point farthest away
+			Point* point;
+			double d = std::numeric_limits<double>::min();
+			for(Point *p : currentFace->visiblePoints) {
+				double distance = ConvexHull<Point>::distance(currentFace, *p);
+				if(distance >= d) {
+					d = distance;
+					point = p;
+				}
+			}
 
-                        //For each one create the new triangular facet to the point
-                        auto f = CH.addFace(e, pn->val);
+			//Find the horizon as seen from that point
+			typename ConvexHull<Point>::HalfEdge* horizonStart = NULL;
+			//First find all visible faces
+			std::vector<typename ConvexHull<Point>::Face*> visibleFaces;
+			bool newFaceAdded = false;
+			currentFace->lastVisitedBy = point;
+			visibleFaces.push_back(currentFace);
 
-                        //Assume you are going in CCW order?
-                        assert(prev->twin->origin == e->origin);
+			//Spread from the current face to the adjacent ones until no new
+			//face can be added
+			do {
+				newFaceAdded = false;
+				currentFace = visibleFaces.back();
+				auto e = currentFace->outerComponent;
 
-                        //Link to the prev face
-                        prev->next->twin = e->prev;
-                        e->prev->twin = prev->next;
+				//Go through the adjacent faces
+				do {
+					auto adjFace = e->twin->incidentFace;
+					if(adjFace->lastVisitedBy != point && ConvexHull<Point>::visible(adjFace, *point)) {
+						std::cout << "-- Processing adjacent face" << std::endl;
+						adjFace->lastVisitedBy = point;
+						visibleFaces.push_back(adjFace);
+						newFaceAdded = true;
+					}
 
-                        prev = e;
+					//If the adjacent face is not visible, this edge lies on the horizon
+					//TODO pull into the othe if-branch
+					if(horizonStart == NULL && !ConvexHull<Point>::visible(adjFace, *point)) {
+						horizonStart = e;
+					}
+					e = e->next;
+				} while(e != currentFace->outerComponent);
+			} while(newFaceAdded);
 
-                        /* For the new face determine the conflicts by testing the
-                         * union of points of P(f1) and P(f2), where f1 and f2 are
-                         * the (old) faces of the current edge.
-                         */
-                        //Get the conflict face node of the faces. TODO more efficient
-                        auto fn1 = std::find(pn->flist.begin(), pn->flist.end(), f1);
-                        auto fn2 = std::find(pn->flist.begin(), pn->flist.end(), f2);
+			assert(horizonStart != NULL);
 
-                        //Now get their conflict lists
-                        auto pointsFromF1 = fn1->plist;
-                        auto pointsFromF2 = fn2->plist;
-                        //Check if the face is visible from the point
-                        for(auto pf1 : pointsFromF1) {
-	                        if(DoublyLinkedEdgeList<Point>::visible(f1, pf1->val)) {
+			//The horizon should be convex when 2D-projected from the point
+			std::vector<typename ConvexHull<Point>::HalfEdge*> horizon;
+			auto currentHorizon = horizonStart;
 
-	                        }
-                        }
+			//Build the horizon step by step until the loop is closed
+			do {
+				horizon.push_back(currentHorizon);
+				//Find adjacent edge that is on the horizon
+				auto nextEdge = currentHorizon->next->twin->next;
+				while(ConvexHull<Point>::visible(nextEdge->twin->incidentFace, *point)) {
+					nextEdge = nextEdge->next->twin->next;
+				}
+				currentHorizon = nextEdge;
+			} while(currentHorizon != horizonStart);
 
-                    } else {
-	                    //Went through the whole horizon, join the start and the end,
-	                    //but don't create a new face
-                        prev->next->twin = e->prev;
-                        e->prev->twin = prev->next;
-                    }
-                }
-            }
-        }
+			//Now iterate over the horizon and build the new faces
+
+			//Also reassign the points of the old visible faces to the new faces
+
+			//Remember to delete the old visible faces (which are no longer in the CH)
+		}
+
 		return CH;
 	}
 }
