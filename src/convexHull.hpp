@@ -61,8 +61,12 @@ public:
 	 * (Positive) distance from a point to a face
 	 */
 	static double distance(const Face* f, const T& p) {
-		//TODO STUB
-		return norm(sub(*(f->outerComponent->origin), p));
+		auto e = f->outerComponent;
+		T* a = e->origin;
+		T* b = e->next->origin;
+		T* c = e->next->next->origin;
+
+		return distanceToTriangle(*a, *b, *c, p);
 	}
 
      /*
@@ -193,7 +197,6 @@ public:
 		for(Face* f : mFaces) {
 			assert(f->outerComponent->incidentFace == f);
 		}
-		int i = 0;
 		for(HalfEdge* e : mHalfEdges) {
 			assert(e->prev->next == e);
 			assert(e->next->prev == e);
@@ -214,6 +217,69 @@ template<typename T>
 using ConvexHull = DoublyLinkedEdgeList<T>;
 
 namespace Convex {
+	template<class Point>
+	std::vector<Point*> extremePoints(std::vector<Point>& points) {
+		std::vector<Point*> tetraPoints;
+		Point *a, *b, *c, *d;
+		double dmax, dcur;
+		dmax = dcur = 0.0;
+		Point* tmp[6] = {&points[0], &points[0], //x min, max
+		                 &points[0], &points[0], //y min, max
+		                 &points[0], &points[0]};//z min, max
+		for(int p = 0; p < points.size(); p++) {
+			if(points.at(p)[0] < (*tmp[0])[0]) tmp[0] = &points.at(p);
+			if(points.at(p)[0] > (*tmp[1])[0]) tmp[1] = &points.at(p);
+			if(points.at(p)[1] < (*tmp[2])[1]) tmp[2] = &points.at(p);
+			if(points.at(p)[1] > (*tmp[3])[1]) tmp[3] = &points.at(p);
+			if(points.at(p)[2] < (*tmp[4])[2]) tmp[4] = &points.at(p);
+			if(points.at(p)[2] > (*tmp[5])[2]) tmp[5] = &points.at(p);
+		}
+
+		//Find the two most distant points
+		for(int i = 0; i < 6; i++) {
+			for(int j = i + 1; j < 6; j++) {
+				dcur = distance(*tmp[i], *tmp[j]);
+				if(dmax < dcur) {
+					dmax = dcur;
+					a = tmp[i];
+					b = tmp[j];
+				}
+			}
+		}
+
+		//Find the most distant point to the line
+		dmax = 0.0;
+		for(int i = 0; i < 6; i++) {
+			dcur = distanceToLine(*a, *b, *tmp[i]);
+			if(dmax < dcur) {
+				dmax = dcur;
+				c = tmp[i];
+			}
+		}
+
+		//Find the most distant point to the plane (from the whole point list)
+		dmax = 0.0;
+		for(int i = 0; i < points.size(); i++) {
+			dcur = distanceToTriangle(*a, *b, *c, points.at(i));
+			if(dmax < dcur) {
+				dmax = dcur;
+				d = &points.at(i);
+			}
+		}
+
+		if(inFront(*a, *b, *c, *d)) {
+			tetraPoints.push_back(b);
+			tetraPoints.push_back(a);
+		} else {
+			tetraPoints.push_back(a);
+			tetraPoints.push_back(b);
+		}
+
+		tetraPoints.push_back(c);
+		tetraPoints.push_back(d);
+
+		return tetraPoints;
+	}
 
 	/*
 	 * Implementation based on the QuickHull algorithm. The idea is to assign to each face of
@@ -224,47 +290,16 @@ namespace Convex {
 	 */
 	template<class Point>
 	ConvexHull<Point> convexHull(std::vector<Point>& points) {
-		const double eps = 0.0001;
+		const double eps = 0.001;
 
-		//Try to find four non-coplanar points, and remove them from the points to be processed
-		std::vector<Point*> remaining;
-		Point p1 = points[0];
-		Point p2 = points[1];
-		Point p3 = p1;
-		Point p4 = p1;
+		//Try to find four non-coplanar points
+		auto tetraPoints = extremePoints<Point>(points);
 
-		unsigned int i = 2;
-		//First find the first non-collinear point to p1 and p2
-		for(; i < points.size(); i++) {
-			Point p = points[i];
-			if(!collinear(p1, p2, p)) {
-				p3 = p;
-				break;
-			}
-			remaining.push_back(&p);
-		}
-
-		//No more points left :( should output something better TODO
-		if(points.size() - i < 2) std::cout << "--ERROR: POINTS LIE ON A PLANE" << std::endl;
-
-		//Now, go on to find the other point of the tetrahedron
-		for(; i < points.size(); i++) {
-			Point p = points[i];
-			if(!coplanar(p1, p2, p3, p)) {
-				p4 = p;
-				break;
-			}
-			remaining.push_back(&p);
-		}
+		assert(tetraPoints.size() == 4);
 
 		ConvexHull<Point> CH;
-		//Check if the tetrahedron would be properly oriented
-		if(!inFront(p1, p2, p3, p4)) {
-			CH.addTetrahedron(p1, p2, p3, p4);
-		} else {
-			//Change the orientation of the base
-			CH.addTetrahedron(p2, p1, p3, p4);
-		}
+
+		CH.addTetrahedron(*tetraPoints[0], *tetraPoints[1], *tetraPoints[2], *tetraPoints[3]);
 
 		auto facesStack = CH.faces();
 		assert(facesStack.size() == 4);
@@ -292,7 +327,7 @@ namespace Convex {
 
 		//Process the stack of facets
 		while(!facesStack.empty()) {
-			std::cout << "Processing face" << std::endl;
+			//std::cout << "Processing face" << std::endl;
 			auto currentFace = facesStack.back();
 			facesStack.pop_back();
 
@@ -326,7 +361,6 @@ namespace Convex {
 				do {
 					auto adjFace = e->twin->incidentFace;
 					if(adjFace->lastVisitedBy != point && ConvexHull<Point>::visible(adjFace, *point)) {
-						std::cout << "-- Processing adjacent face" << std::endl;
 						adjFace->lastVisitedBy = point;
 						visibleFaces.push_back(adjFace);
 						newFaceAdded = true;
@@ -358,9 +392,70 @@ namespace Convex {
 				currentHorizon = nextEdge;
 			} while(currentHorizon != horizonStart);
 
+			//std::cout << "LENGTH OF HORIZON: " << horizon.size() << std::endl;
+
 			//Now iterate over the horizon and build the new faces
+			//Save the last one so that we can go around the horizon
+			std::vector<typename ConvexHull<Point>::Face*> newFaces;
+			auto prev = horizon.back();
+			newFaces.push_back(CH.addFace(prev, point));
+			for(auto e : horizon) {
+				if(e != horizon.back()) {
+					//For each one create the new triangular facet to the point
+					auto f = CH.addFace(e, point);
+					newFaces.push_back(f);
+
+					//Assume you are going in CCW order?
+					assert(prev->twin->origin == e->origin);
+
+					//Link to the prev face
+					prev->next->twin = e->prev;
+					e->prev->twin = prev->next;
+
+					prev = e;
+					assert(e->prev->twin->twin == e->prev);
+					assert(e->prev->twin->origin == e->origin);
+				} else {
+					//Went through the whole horizon, join the start and the end,
+					//but don't create a new face
+					prev->next->twin = e->prev;
+					e->prev->twin = prev->next;
+
+					assert(e->prev->twin->twin == e->prev);
+					assert(e->prev->twin->origin == e->origin);
+				}
+			}
 
 			//Also reassign the points of the old visible faces to the new faces
+			for(auto v : visibleFaces) {
+				for(auto p : v->visiblePoints) {
+					bool visible = false;
+					double d = std::numeric_limits<double>::max();
+					typename ConvexHull<Point>::Face* closestFace = NULL;
+					//Find closest face
+					for(auto f : newFaces) {
+						double distance = ConvexHull<Point>::distance(f, *p);
+						if(ConvexHull<Point>::visible(f, *p) && distance > eps) {
+							if(distance < d) {
+								d = distance;
+								visible = true;
+								closestFace = f;
+							}
+						}
+					}
+					if(visible) {
+						closestFace->visiblePoints.push_back(p);
+					}
+				}
+			}
+
+			//Push the new faces into the faces stack
+			for(auto f : newFaces) {
+				if(!f->visiblePoints.empty()) {
+					facesStack.push_back(f);
+				}
+			}
+			std::cout << "-- NEW STACK SIZE: " << facesStack.size() << std::endl;
 
 			//Remember to delete the old visible faces (which are no longer in the CH)
 		}
