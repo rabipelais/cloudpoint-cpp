@@ -292,10 +292,16 @@ namespace Convex {
 	ConvexHull<Point> convexHull(std::vector<Point>& points) {
 		const double eps = 0.001;
 
+		std::cout << "STARTING POINTS: " << points.size() << std::endl;
+
 		//Try to find four non-coplanar points
 		auto tetraPoints = extremePoints<Point>(points);
 
 		assert(tetraPoints.size() == 4);
+
+		for(auto t : tetraPoints) {
+			std::cout << *t << "\n" << std::endl;
+		}
 
 		ConvexHull<Point> CH;
 
@@ -325,14 +331,28 @@ namespace Convex {
 			}
 		}
 
+		int tPoints = 0;
+		for(auto f : facesStack) {
+			tPoints += f->visiblePoints.size();
+			std::cout << f->visiblePoints.size() << std::endl;;
+		}
+		std::cout << "-- POINTS IN TETRA: " << tPoints << std::endl;
+
 		//Process the stack of facets
 		while(!facesStack.empty()) {
-			//std::cout << "Processing face" << std::endl;
 			auto currentFace = facesStack.back();
+			std::cout << std::endl;
+			std::cout << "Processing face: " << currentFace << std::endl;
 			facesStack.pop_back();
 
+			std::cout << "-- POINTS VISIBLE FROM CURRENT FACE: " << currentFace->visiblePoints.size() << std::endl;
+			if(currentFace->visiblePoints.size() == 0) continue;
+			//std::cout << *currentFace->outerComponent->origin << "\n" << std::endl;
+			//std::cout << *currentFace->outerComponent->next->origin << "\n" << std::endl;
+			//std::cout << *currentFace->outerComponent->next->next->origin << "\n" << std::endl;
+
 			//Find point farthest away
-			Point* point;
+			Point* point = NULL;
 			double d = std::numeric_limits<double>::min();
 			for(Point *p : currentFace->visiblePoints) {
 				double distance = ConvexHull<Point>::distance(currentFace, *p);
@@ -342,28 +362,36 @@ namespace Convex {
 				}
 			}
 
+			// std::cout << "distance: " << d << std::endl;
+			// std::cout << ConvexHull<Point>::distance(currentFace, *point) << std::endl;
+			// std::cout << distanceToTriangle(*currentFace->outerComponent->origin, *currentFace->outerComponent->next->origin, *currentFace->outerComponent->next->next->origin, *point) << std::endl;
+			// std::cout << distanceToTriangle(Point(2.5437, -86.7204, 16.7802), Point(-28.3979, -67.5083, 2.7127), Point(-26.2986, -69.5868, 2.0645), Point(-26.2986, -69.5868, 2.0645)) << std::endl;
+			// std::cout << std::endl;
+
+			// std::cout << *point << "\n" << std::endl;
+
 			//Find the horizon as seen from that point
 			typename ConvexHull<Point>::HalfEdge* horizonStart = NULL;
 			//First find all visible faces
 			std::vector<typename ConvexHull<Point>::Face*> visibleFaces;
-			bool newFaceAdded = false;
+			std::vector<typename ConvexHull<Point>::Face*> toVisit;
 			currentFace->lastVisitedBy = point;
 			visibleFaces.push_back(currentFace);
+			toVisit.push_back(currentFace);
 
 			//Spread from the current face to the adjacent ones until no new
 			//face can be added
-			do {
-				newFaceAdded = false;
-				currentFace = visibleFaces.back();
+			while(!toVisit.empty()) {
+				currentFace = toVisit.back();
+				toVisit.pop_back();
 				auto e = currentFace->outerComponent;
-
 				//Go through the adjacent faces
 				do {
 					auto adjFace = e->twin->incidentFace;
 					if(adjFace->lastVisitedBy != point && ConvexHull<Point>::visible(adjFace, *point)) {
 						adjFace->lastVisitedBy = point;
 						visibleFaces.push_back(adjFace);
-						newFaceAdded = true;
+						toVisit.push_back(adjFace);
 					}
 
 					//If the adjacent face is not visible, this edge lies on the horizon
@@ -373,8 +401,8 @@ namespace Convex {
 					}
 					e = e->next;
 				} while(e != currentFace->outerComponent);
-			} while(newFaceAdded);
-
+			}
+			std::cout << "-- VISIBLE FACES: " << visibleFaces.size() << std::endl;
 			assert(horizonStart != NULL);
 
 			//The horizon should be convex when 2D-projected from the point
@@ -385,14 +413,14 @@ namespace Convex {
 			do {
 				horizon.push_back(currentHorizon);
 				//Find adjacent edge that is on the horizon
-				auto nextEdge = currentHorizon->next->twin->next;
+				auto nextEdge = currentHorizon->next;
 				while(ConvexHull<Point>::visible(nextEdge->twin->incidentFace, *point)) {
-					nextEdge = nextEdge->next->twin->next;
+					nextEdge = nextEdge->twin->next;
 				}
 				currentHorizon = nextEdge;
 			} while(currentHorizon != horizonStart);
 
-			//std::cout << "LENGTH OF HORIZON: " << horizon.size() << std::endl;
+			std::cout << "-- LENGTH OF HORIZON: " << horizon.size() << std::endl;
 
 			//Now iterate over the horizon and build the new faces
 			//Save the last one so that we can go around the horizon
@@ -425,10 +453,14 @@ namespace Convex {
 					assert(e->prev->twin->origin == e->origin);
 				}
 			}
+			std::cout << "-- NEW FACES: " << newFaces.size() << std::endl;
 
+			int visiblePoints = 0;
+			int assignedPoints = 0;
 			//Also reassign the points of the old visible faces to the new faces
 			for(auto v : visibleFaces) {
 				for(auto p : v->visiblePoints) {
+					visiblePoints++;
 					bool visible = false;
 					double d = std::numeric_limits<double>::max();
 					typename ConvexHull<Point>::Face* closestFace = NULL;
@@ -445,17 +477,34 @@ namespace Convex {
 					}
 					if(visible) {
 						closestFace->visiblePoints.push_back(p);
+						assignedPoints++;
 					}
 				}
+				v->visiblePoints.clear();
 			}
-
+			std::cout << "-- VISIBLE POINTS: " << visiblePoints << std::endl;
+			std::cout << "-- NEW ASSIGNED POINTS: " << assignedPoints << std::endl;
 			//Push the new faces into the faces stack
 			for(auto f : newFaces) {
+				std::cout << "*";
 				if(!f->visiblePoints.empty()) {
+					std::cout << "=";
+
+// std::cout << *f->outerComponent->origin << "\n" << std::endl;
+					// std::cout << *f->outerComponent->next->origin << "\n" << std::endl;
+					// std::cout << *f->outerComponent->next->next->origin << "\n" << std::endl;
+
 					facesStack.push_back(f);
 				}
 			}
+			std::cout << std::endl;
 			std::cout << "-- NEW STACK SIZE: " << facesStack.size() << std::endl;
+			int remainingPoints = 0;
+			for(auto f : facesStack) {
+				remainingPoints += f->visiblePoints.size();
+			}
+			std::cout << "-- REMAINING POINTS IN STACK: " << remainingPoints << std::endl;
+
 
 			//Remember to delete the old visible faces (which are no longer in the CH)
 		}
