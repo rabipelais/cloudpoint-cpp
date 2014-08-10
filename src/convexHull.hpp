@@ -23,10 +23,12 @@ public:
 	};
 
 	struct Face {
+		Face() : outerComponent(NULL), lastVisitedBy(NULL), toDelete(false) {}
 		HalfEdge* outerComponent; //The face lies on the left of the edge
 		std::vector<HalfEdge*> innerComponents;
 		std::vector<T*> visiblePoints;
 		T* lastVisitedBy;
+		bool toDelete;
 	};
 
 	~DoublyLinkedEdgeList() {
@@ -102,6 +104,7 @@ public:
         assert(pe->next->incidentFace == pe->incidentFace);
 
         assert(f->outerComponent->incidentFace == f);
+        mFaces.push_back(f);
         return f;
     }
 
@@ -208,6 +211,12 @@ public:
 		}
 	}
 
+	void cleanup() {
+		mFaces.erase(remove_if(mFaces.begin(),
+		                       mFaces.end(),
+		                       [](Face* f){return f->toDelete;}),
+		             mFaces.end());
+	}
 private:
 	std::vector<HalfEdge*> mHalfEdges;
 	std::vector<Face*> mFaces;
@@ -404,6 +413,10 @@ namespace Convex {
 			}
 			std::cout << "-- VISIBLE FACES: " << visibleFaces.size() << std::endl;
 			assert(horizonStart != NULL);
+			//Mark visible faces for deletion later on
+			for(auto v : visibleFaces) {
+				v->toDelete = true;
+			}
 
 			//The horizon should be convex when 2D-projected from the point
 			std::vector<typename ConvexHull<Point>::HalfEdge*> horizon;
@@ -509,6 +522,8 @@ namespace Convex {
 			//Remember to delete the old visible faces (which are no longer in the CH)
 		}
 
+		CH.cleanup();
+		std::cout << "** TOTAL FACES IN CH: " << CH.faces().size() << std::endl;
 		return CH;
 	}
 }
