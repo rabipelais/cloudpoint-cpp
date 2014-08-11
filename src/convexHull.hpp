@@ -128,7 +128,27 @@ public:
 	}
 
 	double volume() {
-		return 0;
+		double volume = 0.0;
+		//Use the origin as the center of the volume calculation
+		//TODO make this more robust (centroid?)
+		T center(0, 0, 0);
+
+		for(auto f : mFaces) {
+			HalfEdge* e = f->outerComponent;
+			T* x = e->origin;
+			T* y = e->next->origin;
+			T* z = e->next->next->origin;
+
+			double a = norm(sub(*y, *x));
+			double b = norm(sub(*z, *x));
+			double c = norm(sub(*y, *z));
+			double p = (a + b + c) / 2;
+
+			double area = sqrt(p * (p - a) * (p - b) * (p - c));
+			double height = distance(f, center);
+			volume += area * height / 3.0;
+		}
+		return volume;
 	}
 
 	/*
