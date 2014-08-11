@@ -108,6 +108,14 @@ public:
         return f;
     }
 
+	double area() {
+		return 0;
+	}
+
+	double volume() {
+		return 0;
+	}
+
 	/*
 	 * Assume the first three vertices are already in CCW fashion
 	 * when looking at the base from the bottom, i.e. the border
