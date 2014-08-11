@@ -109,7 +109,22 @@ public:
     }
 
 	double area() {
-		return 0;
+		double area = 0.0;
+		//Heron's formula
+		for(auto f : mFaces) {
+			HalfEdge* e = f->outerComponent;
+			T* x = e->origin;
+			T* y = e->next->origin;
+			T* z = e->next->next->origin;
+
+			double a = norm(sub(*y, *x));
+			double b = norm(sub(*z, *x));
+			double c = norm(sub(*y, *z));
+			double p = (a + b + c) / 2;
+
+			area += sqrt(p * (p - a) * (p - b) * (p - c));
+		}
+		return area;
 	}
 
 	double volume() {
@@ -532,6 +547,7 @@ namespace Convex {
 
 		CH.cleanup();
 		std::cout << "** TOTAL FACES IN CH: " << CH.faces().size() << std::endl;
+		std::cout << "** AREA: " << CH.area() << std::endl;
 		return CH;
 	}
 }
